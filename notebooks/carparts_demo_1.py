@@ -61,7 +61,7 @@
 # MAGIC %md
 # MAGIC 
 # MAGIC ### Architecture
-# MAGIC <img src="https://raw.githubusercontent.com/bluerider/jhu_population_segmentation/main/img/JHU%20Demographic%20Segmentation.png" width = 100% /img>
+# MAGIC <img src="https://github.com/brickmeister/carparts-demo/raw/main/images/Carparts%20Workshop.png" width = 100% /img>
 
 # COMMAND ----------
 
@@ -98,8 +98,8 @@
 
 # MAGIC %md
 # MAGIC ### Follow up sources
-# MAGIC 1. [Six distinct types of COVID-19](https://www.kcl.ac.uk/news/six-distinct-types-of-covid-19-identified)
-# MAGIC 2. [Do weather conditions influence the transmission fo the coronavirus (SARS-CoV-2)](https://www.cebm.net/covid-19/do-weather-conditions-influence-the-transmission-of-the-coronavirus-sars-cov-2/)
+# MAGIC 1. [Databricks Notebook on Supply Chain Forecasting](https://databricks.com/blog/2020/03/26/new-methods-for-improving-supply-chain-demand-forecasting.html)
+# MAGIC 2. [Fine Grained Demand Forecasting](https://databricks.com/p/webinar/fine-grained-and-scalable-demand-forecasting-apj)
 
 # COMMAND ----------
 
@@ -110,7 +110,7 @@
 
 # MAGIC %md
 # MAGIC 
-# MAGIC ## Retrieve John's Hopkins Data
+# MAGIC ## Retrieve Carparts Data
 
 # COMMAND ----------
 
@@ -125,23 +125,23 @@
 # MAGIC ## get COVID-19 data from JHU CSSE
 # MAGIC ## SOURCE : 
 # MAGIC ##     COVID-19 Data Repository by the Center for Systems Science and Engineering (CSSE) at Johns Hopkins University
-# MAGIC ##     <url: https://github.com/CSSEGISandData/COVID-19>
+# MAGIC ##     <url: https://github.com/brickmeister/carparts-demo>
 # MAGIC 
-# MAGIC git clone https://github.com/CSSEGISandData/COVID-19 /tmp/COVID-19
+# MAGIC git clone https://github.com/brickmeister/carparts-demo /tmp/carparts_demo
 
 # COMMAND ----------
 
 # DBTITLE 1,Add files to DBFS
 # MAGIC %scala
 # MAGIC 
-# MAGIC dbutils.fs.cp("file:///tmp/COVID-19", "dbfs:/tmp/", recurse = true); // copy the COVID-19 data into dbfs
+# MAGIC dbutils.fs.cp("file:///tmp/carparts_demo", "dbfs:/tmp/", recurse = true); // copy the caparts data to dbfs
 
 # COMMAND ----------
 
-# DBTITLE 1,Daily Reports CSV Files
+# DBTITLE 1,Flattened Report CSV Sample File
 # MAGIC %fs
 # MAGIC 
-# MAGIC ls dbfs:/tmp/csse_covid_19_data/csse_covid_19_daily_reports/
+# MAGIC ls dbfs:/tmp/data/Sample_Data.csv
 
 # COMMAND ----------
 
@@ -155,7 +155,7 @@
 # MAGIC 
 # MAGIC import org.apache.spark.sql.functions.{input_file_name, current_timestamp, regexp_extract, to_date};
 # MAGIC import org.apache.spark.sql.DataFrame;
-# MAGIC import org.apache.spark.sql.types.{StructType, StructField, IntegerType, StringType, TimestampType, FloatType};
+# MAGIC import org.apache.spark.sql.types.{StructType, StructField, IntegerType, StringType, TimestampType, FloatType, DateType};
 # MAGIC 
 # MAGIC /*
 # MAGIC 
@@ -163,43 +163,38 @@
 # MAGIC 
 # MAGIC */
 # MAGIC 
-# MAGIC var covid_source : String = "dbfs:/tmp/csse_covid_19_data/csse_covid_19_daily_reports/"; // covid source directory
-# MAGIC var covid_files : Seq[String] = dbutils.fs.ls(covid_source).filter(_.path.contains(".csv")).map(_.path); // covid csv paths
+# MAGIC var data_source : String = "dbfs:/tmp/data/"; // sample data directory
+# MAGIC var data_files : Seq[String] = dbutils.fs.ls(data_source).filter(_.path.contains(".csv")).map(_.path); // covid csv paths
 # MAGIC var basename_regexp : String= "[^/]*(?=\\.[^.]+($|\\?))" // regex to extract the basename from a file (which contains the date)
 # MAGIC 
 # MAGIC /* specify the schema for the dataframe to ensure proper types */
-# MAGIC var covid_schema = StructType(Array(
-# MAGIC                       StructField("FIPS", StringType),
-# MAGIC                       StructField("Admin2", StringType),
-# MAGIC                       StructField("Province_State", StringType),
-# MAGIC                       StructField("Country_Region", StringType),
-# MAGIC                       StructField("Last_Update", TimestampType),
-# MAGIC                       StructField("Lat", FloatType),
-# MAGIC                       StructField("Long_", FloatType),
-# MAGIC                       StructField("Confirmed", IntegerType),
-# MAGIC                       StructField("Deaths", IntegerType),
-# MAGIC                       StructField("Recovered", IntegerType),
-# MAGIC                       StructField("Active", IntegerType),
-# MAGIC                       StructField("Combined_Key", StringType),
-# MAGIC                       StructField("Incidence_Rate", FloatType),
-# MAGIC                       StructField("Case-Fatality_Ratio", FloatType)));
+# MAGIC var data_schema = StructType(Array(
+# MAGIC                       StructField("ID", IntegerType),
+# MAGIC                       StructField("Count_Of_Order_Number", IntegerType),
+# MAGIC                       StructField("Date", TimestampType),
+# MAGIC                       StructField("Order_Type", StringType),
+# MAGIC                       StructField("WH_ID", StringType),
+# MAGIC                       StructField("Date_2", TimestampType),
+# MAGIC                       StructField("Year", IntegerType),
+# MAGIC                       StructField("Week_Number", IntegerType),
+# MAGIC                       StructField("Days_Until_IRS_Refund", IntegerType),
+# MAGIC                       StructField("Days_Until_Stimulus_check", IntegerType)));
 # MAGIC 
-# MAGIC var df_covid : DataFrame = spark.read
+# MAGIC var df_data : DataFrame = spark.read
 # MAGIC                               .format("csv") // files are in csv format
 # MAGIC                               .option("header", "true") // there's a header for each file
-# MAGIC                               .schema(covid_schema) // specify schema to enforce types
-# MAGIC                               .load(covid_files : _*) // load specified files using splat operator
+# MAGIC                               .schema(data_schema) // specify schema to enforce types
+# MAGIC                               .load(data_files : _*) // load specified files using splat operator
 # MAGIC                               .withColumn("file_source", input_file_name) // append the source file path
 # MAGIC                               .withColumn("ingested_time", current_timestamp) // append the ingested time
-# MAGIC                               .withColumn("date", to_date(regexp_extract($"file_source", basename_regexp, 0), "MM-dd-yyyy")) // append the date each file was created (date data is valid for)
-# MAGIC                               .withColumnRenamed("Admin2", "County") // rename admin2 to county since it makes more sense
 # MAGIC 
-# MAGIC df_covid.write
+# MAGIC df_data.write
 # MAGIC         .format("delta")
 # MAGIC         .mode("overwrite")
-# MAGIC         .saveAsTable("jhu_covid_data")
+# MAGIC         .option("overwriteSchema", "true")
+# MAGIC         .saveAsTable("carparts_data");
 # MAGIC 
-# MAGIC display(df_covid); // display the dataframe
+# MAGIC display(df_data); // display the dataframe
 
 # COMMAND ----------
 
@@ -212,10 +207,9 @@
 # MAGIC   Setup a dataframe to read in data from
 # MAGIC   a gold level table  
 # MAGIC */
-# MAGIC 
 # MAGIC val df : DataFrame = spark.read
 # MAGIC                           .format("delta")
-# MAGIC                           .table("jhu_covid_data");
+# MAGIC                           .table("carparts_data");
 # MAGIC 
 # MAGIC display(df)
 
@@ -236,7 +230,7 @@
 # MAGIC -- Get the schema of the columns
 # MAGIC --
 # MAGIC 
-# MAGIC DESCRIBE jhu_covid_data;
+# MAGIC DESCRIBE carparts_data;
 
 # COMMAND ----------
 
@@ -253,22 +247,39 @@
 # MAGIC 
 # MAGIC SELECT date,
 # MAGIC        count(date) as record_counts
-# MAGIC FROM jhu_covid_data
+# MAGIC FROM carparts_data
 # MAGIC GROUP BY date
 # MAGIC ORDER BY date asc;
 
 # COMMAND ----------
 
-# DBTITLE 1,Number of Counties Added Over Time
+# DBTITLE 1,Total Number of Count Orders Over Time
 # MAGIC %sql
 # MAGIC 
-# MAGIC -- look at the increase in administrators adding data into the system as a function of time during the outbreak
+# MAGIC -- look at the total number of count orders per date
 # MAGIC 
 # MAGIC SELECT date,
-# MAGIC        count(distinct county) as number_of_counties
-# MAGIC FROM jhu_covid_data
+# MAGIC        sum(Count_Of_Order_Number) as total_numer_of_count_orders
+# MAGIC FROM carparts_data
 # MAGIC GROUP BY date
 # MAGIC ORDER BY date asc;
+
+# COMMAND ----------
+
+# DBTITLE 1,Total Number of Orders Per Order Type Per Week in each Warehouse
+# MAGIC %sql
+# MAGIC 
+# MAGIC -- look at the total number of orders brokend own by counts per warehouse id, week number, and order type
+# MAGIC 
+# MAGIC SELECT week_number,
+# MAGIC        wh_id,
+# MAGIC        order_type,
+# MAGIC        sum(Count_Of_Order_Number) as total_numer_of_count_orders
+# MAGIC FROM carparts_data
+# MAGIC GROUP BY week_number,
+# MAGIC          wh_id,
+# MAGIC          order_type
+# MAGIC ORDER BY week_number asc;
 
 # COMMAND ----------
 
@@ -284,14 +295,17 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Remove Data That Doesn't Contain a FIPS
+# DBTITLE 1,Remove Data That Doesn't Contain an ID
 # MAGIC %scala
 # MAGIC 
 # MAGIC /*
 # MAGIC   Remove censored data and cast data to proper data types
 # MAGIC */
 # MAGIC 
-# MAGIC val cleaned_df : DataFrame = df.filter($"FIPS".isNotNull)
+# MAGIC val cleaned_df : DataFrame = df.filter($"ID".isNotNull)
+# MAGIC                                .na.drop()
+# MAGIC 
+# MAGIC cleaned_df.createOrReplaceTempView("cleaned_df")
 # MAGIC 
 # MAGIC display(cleaned_df)
 
@@ -314,20 +328,18 @@
 # MAGIC 
 # MAGIC """
 # MAGIC 
-# MAGIC df_covid = spark.read\
-# MAGIC                 .format("delta")\
-# MAGIC                 .table("jhu_covid_data")\
-# MAGIC                 .na.drop() ## feed the temporary view into a python dataframe and drop all nulls
+# MAGIC df_cleaned = spark.sql("SELECT * FROM CLEANED_DF")
 # MAGIC 
-# MAGIC indexer = StringIndexer(inputCols=["Province_State", "Country_Region", "Combined_Key"],
-# MAGIC                         outputCols=["category_province_state", "category_country_region", "category_combined_key"]) ## encode text into indices for k-means calculations
+# MAGIC indexer = StringIndexer(inputCols=["Order_Type", "WH_ID"],
+# MAGIC                         outputCols=["ORDER_TYPE_CATEGORY", "WH_ID_CATEGORY"]) ## encode text into indices for k-means calculations
 # MAGIC 
-# MAGIC df_covid_indexed = indexer.fit(df_covid).transform(df_covid) ## generate the indexed dataframe
+# MAGIC df_indexed = indexer.fit(df_cleaned)\
+# MAGIC                     .transform(df_cleaned) ## generate the indexed dataframe
 # MAGIC 
-# MAGIC features = [x for x in df_covid_indexed.columns if x not in ["ingested_time", "file_source", "date", "FIPS", "Last_Update", "Province_State", "Country_Region", "Combined_Key", "County"]] ## use all features except metadata or those string indexed
+# MAGIC features = [x for x in df_indexed.columns if x not in ["ID", "Date", "Date_2", "file_source", "ingested_time", "Order_Type", "WH_ID"]] ## use all features except metadata or those string indexed
 # MAGIC 
 # MAGIC assembler = VectorAssembler(inputCols = features,
-# MAGIC                                 outputCol = "features")
+# MAGIC                             outputCol = "features")
 
 # COMMAND ----------
 
@@ -345,7 +357,7 @@
 # MAGIC   Separate the training and testing dataset into two dataframes
 # MAGIC """
 # MAGIC 
-# MAGIC dfDataset = assembler.transform(df_covid_indexed)
+# MAGIC dfDataset = assembler.transform(df_indexed)
 # MAGIC trainingDF, testingDF = dfDataset.randomSplit([0.7, 0.3])
 
 # COMMAND ----------
@@ -509,7 +521,7 @@
 # MAGIC """
 # MAGIC 
 # MAGIC 
-# MAGIC optimalClusterModel = kMeansTuning[9][1][0]
+# MAGIC optimalClusterModel = kMeansTuning[3][1][0]
 # MAGIC 
 # MAGIC ## label the training and testing dataframes
 # MAGIC clusteredtrainingDF = optimalClusterModel.transform(trainingDF)\
@@ -783,7 +795,7 @@ def dtcTrain(p_max_depth : int,
 # MAGIC deployment_ml_pipeline : Pipeline = Pipeline(stages = [indexer, assembler, optimalDTCModel])
 # MAGIC 
 # MAGIC # Create the pipeline transformer for the model by combining existing transformers
-# MAGIC deployment_ml_pipeline_model : PipelineModel = deployment_ml_pipeline.fit(df_covid)
+# MAGIC deployment_ml_pipeline_model : PipelineModel = deployment_ml_pipeline.fit(df_cleaned)
 
 # COMMAND ----------
 
@@ -798,11 +810,11 @@ def dtcTrain(p_max_depth : int,
 # MAGIC from pyspark.sql import DataFrame
 # MAGIC 
 # MAGIC """
-# MAGIC Forecast some results on the JHU Covid dataset
+# MAGIC Forecast some results on the Carparts dataset
 # MAGIC """
 # MAGIC 
 # MAGIC # classify the raw dataframe
-# MAGIC df_deployed_pipeline_classification : DataFrame = deployment_ml_pipeline_model.transform(df_covid)
+# MAGIC df_deployed_pipeline_classification : DataFrame = deployment_ml_pipeline_model.transform(df_cleaned)
 # MAGIC 
 # MAGIC # visualize the results
 # MAGIC display(df_deployed_pipeline_classification)
@@ -826,25 +838,25 @@ def dtcTrain(p_max_depth : int,
 # MAGIC """
 # MAGIC 
 # MAGIC model_version_major = 1
-# MAGIC model_version_minor = 2
+# MAGIC model_version_minor = 1
 # MAGIC 
 # MAGIC with mlflow.start_run() as run:
 # MAGIC   # get the dataframe signature for the model
-# MAGIC   _signature = mlflow.models.infer_signature(df_covid\
+# MAGIC   _signature = mlflow.models.infer_signature(df_cleaned\
 # MAGIC                                               .drop("ingested_time")\
 # MAGIC                                               .drop("date")\
-# MAGIC                                               .drop("Last_Update"),
+# MAGIC                                               .drop("date_2"),
 # MAGIC                                             df_deployed_pipeline_classification\
 # MAGIC                                               .drop("features")\
 # MAGIC                                               .drop("ingested_time")\
 # MAGIC                                               .drop("date")\
-# MAGIC                                               .drop("Last_Update")\
+# MAGIC                                               .drop("date_2")\
 # MAGIC                                               .drop("probability")\
 # MAGIC                                               .drop("rawPrediction"))
 # MAGIC   # Log the model
 # MAGIC   mlflow.spark.log_model(spark_model = deployment_ml_pipeline_model,
 # MAGIC                          signature = _signature,
-# MAGIC                          registered_model_name = "jhu_covid",
+# MAGIC                          registered_model_name = "carparts_demo",
 # MAGIC                          artifact_path = f"pipeline_model_v{model_version_major}.{model_version_minor}"
 # MAGIC                         )
 
@@ -868,7 +880,7 @@ def dtcTrain(p_max_depth : int,
 # MAGIC Generate JSON records
 # MAGIC """
 # MAGIC 
-# MAGIC json_records = df_covid.limit(100).toPandas().to_json(orient='split')
+# MAGIC json_records = df_cleaned.limit(100).toPandas().to_json(orient='split')
 # MAGIC print(json_records)
 
 # COMMAND ----------
