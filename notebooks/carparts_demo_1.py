@@ -184,7 +184,7 @@
 # MAGIC 
 # MAGIC /*
 # MAGIC 
-# MAGIC   Load the John's Hopkin's COVID-19 data into a dataframe
+# MAGIC   Load the Caparts data into a dataframe
 # MAGIC 
 # MAGIC */
 # MAGIC 
