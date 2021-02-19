@@ -73,6 +73,7 @@
 # MAGIC * [Delta Lake](https://docs.delta.io/latest/delta-intro.html)
 # MAGIC * [SparkML](http://spark.apache.org/docs/latest/ml-guide.html)
 # MAGIC * [MLFlow](https://www.mlflow.org/docs/latest/index.html)
+# MAGIC * [SparkXGBoost](https://github.com/sllynn/spark-xgboost.git)
 
 # COMMAND ----------
 
@@ -104,6 +105,31 @@
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC 
+# MAGIC # Install libraries
+
+# COMMAND ----------
+
+# DBTITLE 1,Grab Spark XGBoost Library
+# MAGIC %sh
+# MAGIC git clone https://github.com/sllynn/spark-xgboost.git;
+# MAGIC cd spark-xgboost;
+# MAGIC pip install -e .;
+
+# COMMAND ----------
+
+# DBTITLE 1,Restart Python Instance
+# MAGIC %python
+# MAGIC 
+# MAGIC """
+# MAGIC Restart Python to avoid an import error
+# MAGIC """
+# MAGIC 
+# MAGIC dbutils.library.restartPython()
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC # Setup Dataset
 
 # COMMAND ----------
@@ -122,9 +148,8 @@
 # DBTITLE 1,Download Data From GIT
 # MAGIC %sh
 # MAGIC 
-# MAGIC ## get COVID-19 data from JHU CSSE
 # MAGIC ## SOURCE : 
-# MAGIC ##     COVID-19 Data Repository by the Center for Systems Science and Engineering (CSSE) at Johns Hopkins University
+# MAGIC ##     Get data from carparts demo
 # MAGIC ##     <url: https://github.com/brickmeister/carparts-demo>
 # MAGIC 
 # MAGIC git clone https://github.com/brickmeister/carparts-demo /tmp/carparts_demo
@@ -266,10 +291,10 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,Total Number of Orders Per Order Type Per Week in each Warehouse
+# DBTITLE 1,Get more data on the total number of counts
 # MAGIC %sql
 # MAGIC 
-# MAGIC -- look at the total number of orders brokend own by counts per warehouse id, week number, and order type
+# MAGIC -- look at the total number of orders broken down by counts per warehouse id, week number, and order type
 # MAGIC 
 # MAGIC SELECT week_number,
 # MAGIC        wh_id,
@@ -563,16 +588,15 @@
 
 # MAGIC %md
 # MAGIC 
-# MAGIC ## Decision Tree Model Training
+# MAGIC ## Tree Model Training
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### Training Function
+# MAGIC ### Decision Training Function
 
 # COMMAND ----------
 
-# DBTITLE 1,Decision Tree Training Function
 import mlflow
 from pyspark.ml.classification import DecisionTreeClassifier
 from pyspark.ml.evaluation import MulticlassClassificationEvaluator
@@ -629,6 +653,123 @@ def dtcTrain(p_max_depth : int,
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ### XGBoost Training Function
+
+# COMMAND ----------
+
+# DBTITLE 1,XGBoost Training Function
+# MAGIC %python
+# MAGIC 
+# MAGIC """
+# MAGIC XGBoost Trainer
+# MAGIC """
+# MAGIC 
+# MAGIC import mlflow
+# MAGIC from sparkxgb import XGBoostClassifier
+# MAGIC from pyspark.ml.evaluation import MulticlassClassificationEvaluator
+# MAGIC from pyspark.sql import DataFrame
+# MAGIC from typing import Tuple
+# MAGIC 
+# MAGIC def xgbTrain(p_max_depth : int,
+# MAGIC              training_data : DataFrame,
+# MAGIC              test_data : DataFrame,
+# MAGIC              seed : int,
+# MAGIC              featuresCol : str,
+# MAGIC              labelCol : str) -> Tuple[int, float]:
+# MAGIC   with mlflow.start_run() as run:
+# MAGIC     # log some parameters
+# MAGIC     mlflow.log_param("Maximum_depth", p_max_depth)
+# MAGIC     mlflow.log_metric("Training Data Rows", training_data.count())
+# MAGIC     mlflow.log_metric("Test Data Rows", test_data.count())
+# MAGIC     
+# MAGIC     # start the decision tree classifier
+# MAGIC     dtc = XGBoostClassifier()\
+# MAGIC               .setFeaturesCol(featuresCol)\
+# MAGIC               .setLabelCol(labelCol)\
+# MAGIC               .setMaxDepth(10)\
+# MAGIC               .setSeed(1)\
+# MAGIC               .setPredictionCol("predictions")
+# MAGIC     
+# MAGIC     # Start up the evaluator
+# MAGIC     evaluator = MulticlassClassificationEvaluator()\
+# MAGIC                       .setLabelCol("cluster")\
+# MAGIC                       .setPredictionCol("predictions")
+# MAGIC 
+# MAGIC     # Train a model
+# MAGIC     model = dtc.fit(training_data)
+# MAGIC 
+# MAGIC     # Make some predictions
+# MAGIC     predictions = model.transform(test_data)
+# MAGIC 
+# MAGIC     # Evaluate the tree
+# MAGIC     silhouette = evaluator.evaluate(predictions)
+# MAGIC     
+# MAGIC     # Log the accuracy
+# MAGIC     mlflow.log_metric("F1", silhouette)
+# MAGIC     
+# MAGIC #     # Log the feature importances
+# MAGIC #     mlflow.log_param("Feature Importances", model.featureImportances)
+# MAGIC     
+# MAGIC     # Log the model
+# MAGIC     mlflow.spark.log_model(model, f"XGBoost_Tree{p_max_depth}")
+# MAGIC     
+# MAGIC     ## Return the class and silhouette
+# MAGIC     return (model, silhouette)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Train the XGBoost Tree
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC #### Hyperparameter tuning for Max Depth
+
+# COMMAND ----------
+
+# MAGIC %python
+# MAGIC 
+# MAGIC """
+# MAGIC Tune the max depth of the Boost tree
+# MAGIC """
+# MAGIC 
+# MAGIC xgbTuning = [(i, xgbTrain(p_max_depth = i,
+# MAGIC                           training_data = clusteredtrainingDF,
+# MAGIC                           test_data = clusteredTestingDF,
+# MAGIC                           seed = 1,
+# MAGIC                           featuresCol = "features",
+# MAGIC                           labelCol = "cluster"))
+# MAGIC               for i in range(2, 15, 1)]
+# MAGIC 
+# MAGIC ## Return the results into a series of arrays
+# MAGIC xgbF1 = [(a[0], a[1][1]) for a in xgbTuning]
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC #### Elbow Plot
+
+# COMMAND ----------
+
+# DBTITLE 1,XGBoost Tuning
+# MAGIC %python
+# MAGIC 
+# MAGIC """
+# MAGIC   Show the efffect of increasing the max depth
+# MAGIC   for a XGBoost Tree
+# MAGIC """
+# MAGIC 
+# MAGIC xgbF1DF = sc.parallelize(xgbF1)\
+# MAGIC                       .toDF()\
+# MAGIC                       .withColumnRenamed("_1", "Max Depth")\
+# MAGIC                       .withColumnRenamed("_2", "F1")
+# MAGIC 
+# MAGIC display(xgbF1DF)
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ### Train the Decision Tree
 
 # COMMAND ----------
@@ -638,7 +779,6 @@ def dtcTrain(p_max_depth : int,
 
 # COMMAND ----------
 
-# DBTITLE 1,Tune Tree Depth
 # MAGIC %python
 # MAGIC 
 # MAGIC """
@@ -663,7 +803,6 @@ def dtcTrain(p_max_depth : int,
 
 # COMMAND ----------
 
-# DBTITLE 1,Decision Tree Tuning
 # MAGIC %python
 # MAGIC 
 # MAGIC """
@@ -909,7 +1048,7 @@ pd.read_json(json_records, orient = 'split')
 # MAGIC """
 # MAGIC 
 # MAGIC # define the model scoring function
-# MAGIC def score_model(dataset: pd.DataFrame):
+# MAGIC def score_model():
 # MAGIC   url = 'https://field-eng.cloud.databricks.com/model/jhu_covid/3/invocations'
 # MAGIC   headers = {'Authorization': f'Bearer {dbutils.secrets.get("ml-ml", "TOKEN")}'}
 # MAGIC   data_json = json_records
@@ -919,4 +1058,4 @@ pd.read_json(json_records, orient = 'split')
 # MAGIC   return response.json()
 # MAGIC 
 # MAGIC # score the model
-# MAGIC score_model(df_dataset)
+# MAGIC score_model()
