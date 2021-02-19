@@ -901,10 +901,10 @@ def dtcTrain(p_max_depth : int,
 # MAGIC """
 # MAGIC 
 # MAGIC # choose the third decision tree model
-# MAGIC optimalDTCModel = dtcTuning[5][1][0]
+# MAGIC optimalXGBModel = xgbTuning[5][1][0]
 # MAGIC 
 # MAGIC # create the segmentation DF
-# MAGIC segmentationDF = optimalDTCModel.transform(testingDF)
+# MAGIC segmentationDF = optimalXGBModel.transform(testingDF)
 # MAGIC 
 # MAGIC display(segmentationDF);
 
@@ -931,7 +931,7 @@ def dtcTrain(p_max_depth : int,
 # MAGIC """
 # MAGIC 
 # MAGIC # Combine the existing models into a pipeline
-# MAGIC deployment_ml_pipeline : Pipeline = Pipeline(stages = [indexer, assembler, optimalDTCModel])
+# MAGIC deployment_ml_pipeline : Pipeline = Pipeline(stages = [indexer, assembler, optimalXGBModel])
 # MAGIC 
 # MAGIC # Create the pipeline transformer for the model by combining existing transformers
 # MAGIC deployment_ml_pipeline_model : PipelineModel = deployment_ml_pipeline.fit(df_cleaned)
