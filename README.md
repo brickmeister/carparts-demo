@@ -1,8 +1,33 @@
-# carparts-demo
+# Carparts Demo
   Labor costs are a significant portion of optimizable costs associated with inventory warehousing. Developing better labor hour allocation requires more accurate forecasting of client demand in conjunction with current employee resource counts. Herein, we demonstrate a method of segmenting historical
+
+# Table of Contents
+- [Architecture](#architecture)
+- [Dataset](#dataset)
+  - [Schema](#schema)
+- [Libraries](#libraries-used)
+- [Models](#models-used)
 
 # Architecture
 ![architecture](https://github.com/brickmeister/carparts-demo/raw/main/images/Carparts%20Workshop.png)
+
+# Dataset
+
+Data used in this analysis was generously obtained from Carparts.
+
+## Schema
+
+| Field | Data Type | Description |
+| ------------ | ------------ | ------------ |
+| ""| IntegerType|Index ID |
+| "Count Of Order Number"| IntegerType| Order Count |
+| "Order Type"| StringType| Order Type|
+| "WH ID"| StringType| Site Warehouse ID |
+| "Date"| TimestampType| Date of request|å
+| "Year"| IntegerType| Year of request|
+| "Week_Number"| IntegerType| Week Number of the Year |
+| "Days_Until_IRS_Refund"| IntegerType| Days Until IRS Refund |
+| "Days_Until_Stimulus_Check"| IntegerType| Days Until USA Federal Government Stimulus Check |
 
 # Libraries used
 * [Spark DataFrames](https://spark.apache.org/docs/latest/sql-programming-guide.html)
