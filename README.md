@@ -2,7 +2,7 @@
   Labor costs are a significant portion of optimizable costs associated with inventory warehousing. Developing better labor hour allocation requires more accurate forecasting of client demand in conjunction with current employee resource counts. Herein, we demonstrate a method of segmenting historical
 
 # Architecture
-<img src="https://github.com/brickmeister/carparts-demo/raw/main/images/Carparts%20Workshop.png" width = 100% /img>
+![architecture](https://github.com/brickmeister/carparts-demo/raw/main/images/Carparts%20Workshop.png)
 
 # Libraries used
 * [Spark DataFrames](https://spark.apache.org/docs/latest/sql-programming-guide.html)
